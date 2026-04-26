@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Pelota base blanca -->
+  <circle cx="50" cy="50" r="47" fill="white" stroke="#222" stroke-width="3"/>
+  <!-- Pentagono central negro -->
+  <polygon points="50,22 63,32 58,47 42,47 37,32" fill="#111"/>
+  <!-- Pentagono superior izquierdo -->
+  <polygon points="22,38 37,32 42,47 30,58 16,50" fill="#111"/>
+  <!-- Pentagono superior derecho -->
+  <polygon points="78,38 84,50 70,58 58,47 63,32" fill="#111"/>
+  <!-- Pentagono inferior izquierdo -->
+  <polygon points="16,50 30,58 28,73 14,68 10,55" fill="#111"/>
+  <!-- Pentagono inferior derecho -->
+  <polygon points="84,50 90,55 86,68 72,73 70,58" fill="#111"/>
+  <!-- Pentagono inferior centro -->
+  <polygon points="30,58 42,47 58,47 70,58 60,72 40,72" fill="#111"/>
+</svg>

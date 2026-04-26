@@ -1,0 +1,23 @@
+# Variables de entorno (NUNCA subir al repo)
+.env
+.env.*
+!.env.example
+
+# Deploy local
+deploy/.env
+
+# Uploads
+api.canchas/uploads/
+
+# Logs
+*.log
+logs/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Scripts de test
+test-*
+test_*
+*.bat
