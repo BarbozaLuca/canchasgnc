@@ -112,7 +112,6 @@ function InfoSection({ perfil, onUpdate }) {
               className="bg-[#0A0A0A] border-white/10 text-white placeholder:text-[#A1A1AA]/50 rounded-sm focus:border-[#ccff00] focus:ring-[#ccff00]/20 pl-10"
             />
           </div>
-          <p className="text-[10px] text-[#A1A1AA] mt-1">Opcional. Para que el complejo pueda contactarte</p>
         </div>
         <Button
           onClick={handleSave}
