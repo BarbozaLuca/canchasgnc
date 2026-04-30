@@ -66,4 +66,7 @@ public class User {
 
     @Column(columnDefinition = "boolean default true")
     private boolean puedeGestionarTurnosFijos = true;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean puedeVerFacturacion = false;
 }

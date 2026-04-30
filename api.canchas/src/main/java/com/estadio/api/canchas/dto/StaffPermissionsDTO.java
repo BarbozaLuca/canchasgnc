@@ -15,4 +15,5 @@ public class StaffPermissionsDTO {
     private boolean puedeCambiarEstado;
     private boolean puedeGestionarBloqueos;
     private boolean puedeGestionarTurnosFijos;
+    private boolean puedeVerFacturacion;
 }

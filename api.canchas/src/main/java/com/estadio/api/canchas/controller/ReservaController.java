@@ -160,7 +160,7 @@ public class ReservaController {
 
     // Estadísticas de facturación para el panel admin
     @GetMapping("/facturacion")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('STAFF') and @staffPermissionChecker.check(authentication,'VER_FACTURACION'))")
     public ResponseEntity<FacturacionDTO> getFacturacion() {
         return ResponseEntity.ok(reservaService.getFacturacion());
     }

@@ -32,6 +32,7 @@ public class StaffPermissionChecker {
             case "CAMBIAR_ESTADO"      -> user.isPuedeCambiarEstado();
             case "GESTIONAR_BLOQUEOS"  -> user.isPuedeGestionarBloqueos();
             case "GESTIONAR_TURNOS"    -> user.isPuedeGestionarTurnosFijos();
+            case "VER_FACTURACION"     -> user.isPuedeVerFacturacion();
             default -> false;
         };
     }

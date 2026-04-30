@@ -67,11 +67,13 @@ export default function Panel() {
                 <Ban className="mr-1.5 sm:mr-2 h-4 w-4" /> Bloqueos
               </TabsTrigger>
             )}
+            {canDo("puedeVerFacturacion") && (
+              <TabsTrigger value="facturacion" className="rounded-sm data-[state=active]:bg-[#ccff00] data-[state=active]:text-black text-[#A1A1AA] px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" data-testid="tab-facturacion">
+                <DollarSign className="mr-1.5 sm:mr-2 h-4 w-4" /> Facturacion
+              </TabsTrigger>
+            )}
             {isAdmin && (
               <>
-                <TabsTrigger value="facturacion" className="rounded-sm data-[state=active]:bg-[#ccff00] data-[state=active]:text-black text-[#A1A1AA] px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" data-testid="tab-facturacion">
-                  <DollarSign className="mr-1.5 sm:mr-2 h-4 w-4" /> Facturacion
-                </TabsTrigger>
                 <TabsTrigger value="canchas" className="rounded-sm data-[state=active]:bg-[#ccff00] data-[state=active]:text-black text-[#A1A1AA] px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" data-testid="tab-canchas">
                   <MapPin className="mr-1.5 sm:mr-2 h-4 w-4" /> Canchas
                 </TabsTrigger>
@@ -89,7 +91,7 @@ export default function Panel() {
           <TabsContent value="agenda"><AgendaTab canCrear={canDo("puedeCrearReservas")} canCambiarEstado={canDo("puedeCambiarEstado")} /></TabsContent>
           {canDo("puedeGestionarTurnosFijos") && <TabsContent value="turnos-fijos"><TurnosFijosTab /></TabsContent>}
           {canDo("puedeGestionarBloqueos") && <TabsContent value="bloqueos"><BloqueosTab /></TabsContent>}
-          {isAdmin && <TabsContent value="facturacion"><FacturacionTab /></TabsContent>}
+          {canDo("puedeVerFacturacion") && <TabsContent value="facturacion"><FacturacionTab /></TabsContent>}
           {isAdmin && <TabsContent value="canchas"><CanchasTab /></TabsContent>}
           {isAdmin && <TabsContent value="usuarios"><UsuariosTab /></TabsContent>}
           {isAdmin && <TabsContent value="config"><ConfigTab /></TabsContent>}
@@ -632,6 +634,7 @@ const PERMISOS_LABELS = [
   { key: "puedeCambiarEstado",      label: "Cambiar estado",        desc: "Confirmar, completar o cancelar reservas" },
   { key: "puedeGestionarBloqueos",  label: "Gestionar bloqueos",    desc: "Crear y eliminar bloqueos de horarios" },
   { key: "puedeGestionarTurnosFijos", label: "Gestionar turnos fijos", desc: "Crear y eliminar turnos fijos" },
+  { key: "puedeVerFacturacion",     label: "Ver facturación",       desc: "Ver estadísticas y reportes de facturación" },
 ];
 
 function UsuariosTab() {
@@ -659,6 +662,7 @@ function UsuariosTab() {
       puedeCambiarEstado: u.puedeCambiarEstado,
       puedeGestionarBloqueos: u.puedeGestionarBloqueos,
       puedeGestionarTurnosFijos: u.puedeGestionarTurnosFijos,
+      puedeVerFacturacion: u.puedeVerFacturacion,
     });
     setDialogPermisos(u);
   };
