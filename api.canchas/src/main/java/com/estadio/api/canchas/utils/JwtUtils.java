@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
 @Component
 public class JwtUtils {
 
-    // 30 minutos en milisegundos
-    private static final long EXPIRATION_MS = 1_800_000L;
+    // 8 horas en milisegundos
+    private static final long EXPIRATION_MS = 28_800_000L;
 
     @Value("${security.jwt.private.key}")
     private String privateKey;

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 import { toast } from "sonner";
-import { Bell, Loader2, Volume2, VolumeX, XCircle, Check, CheckCheck, CircleDot, CheckCircle2 } from "lucide-react";
+import { Bell, Clock, Loader2, Volume2, VolumeX, XCircle, Check, CheckCheck, CircleDot, CheckCircle2 } from "lucide-react";
 
 const POLL_INTERVAL = 15000;
 
@@ -48,6 +48,7 @@ const TIPO_CONFIG = {
   CONFIRMADA: { icon: CheckCircle2, color: "text-[#ccff00]", bg: "bg-[#ccff00]/10", label: "Confirmada" },
   CANCELADA: { icon: XCircle, color: "text-red-400", bg: "bg-red-400/10", label: "Cancelada" },
   COMPLETADA: { icon: Check, color: "text-blue-400", bg: "bg-blue-400/10", label: "Completada" },
+  PENDIENTE: { icon: Clock, color: "text-yellow-400", bg: "bg-yellow-400/10", label: "Pago pendiente" },
 };
 
 // ────────────────────────────────────────

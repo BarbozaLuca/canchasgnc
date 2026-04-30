@@ -8,10 +8,12 @@ import com.estadio.api.canchas.dto.ReservaResponseDTO;
 import com.estadio.api.canchas.model.BloqueoHorario;
 import com.estadio.api.canchas.model.ConfigPago;
 import com.estadio.api.canchas.model.EstadoReserva;
+import com.estadio.api.canchas.model.Notificacion;
 import com.estadio.api.canchas.model.Reserva;
 import com.estadio.api.canchas.model.User;
 import com.estadio.api.canchas.repository.BloqueoHorarioRepository;
 import com.estadio.api.canchas.repository.DiaNoLaborableRepository;
+import com.estadio.api.canchas.repository.NotificacionRepository;
 import com.estadio.api.canchas.repository.TurnoFijoRepository;
 import com.estadio.api.canchas.service.ConfigPagoService;
 import com.estadio.api.canchas.service.IReservaService;
@@ -32,6 +34,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +58,7 @@ public class ReservaController {
     private final BloqueoHorarioRepository bloqueoHorarioRepository;
     private final DiaNoLaborableRepository diaNoLaborableRepository;
     private final TurnoFijoRepository turnoFijoRepository;
+    private final NotificacionRepository notificacionRepository;
 
     @Value("${pago.limite.minutos}")
     private int limiteMinutos;
@@ -273,6 +277,16 @@ public class ReservaController {
         dto.setUsuarioId(usuario.getId());
 
         Reserva reserva = reservaService.crear(dto);
+
+        // Notificar al usuario que tiene una reserva pendiente de pago
+        Notificacion notif = new Notificacion();
+        notif.setTipo("PENDIENTE");
+        notif.setMensaje("Tenés una reserva pendiente para el " + reserva.getFecha()
+                + " a las " + reserva.getHoraInicio() + ". Completá el pago desde Mis Reservas.");
+        notif.setUsuario(usuario);
+        notif.setReserva(reserva);
+        notif.setCreatedAt(LocalDateTime.now());
+        notificacionRepository.save(notif);
 
         // Generar link de pago de Mercado Pago
         try {

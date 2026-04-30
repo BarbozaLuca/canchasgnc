@@ -11,8 +11,8 @@ public class ReservaScheduler {
 
     private final IReservaService reservaService;
 
-    // Se ejecuta cada 2 minutos — cancela reservas PENDIENTES que pasaron el límite de pago
-    @Scheduled(fixedRate = 120000) // 2 min = 120.000 ms
+    // Se ejecuta cada 1 minuto — cancela reservas PENDIENTES que pasaron el límite de pago
+    @Scheduled(fixedRate = 60000) // 1 min = 60.000 ms
     public void cancelarReservasVencidas() {
         reservaService.cancelarReservasVencidas();
     }
