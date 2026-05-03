@@ -172,9 +172,9 @@ export default function Booking() {
                 <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-[#ccff00]" /></div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-3" data-testid="timeslots-grid">
-                  {horarios.map(slot => {
+                  {horarios.filter(slot => slot.disponible).map(slot => {
                     const isSelected = selected?.horaInicio === slot.horaInicio;
-                    const isDisabled = !slot.disponible;
+                    const isDisabled = false;
                     return (
                       <button
                         key={slot.horaInicio}
@@ -191,7 +191,7 @@ export default function Booking() {
                           {timeLabel(slot.horaInicio, horarios)}
                         </p>
                         <p className={`text-xs mt-1 ${isSelected ? "text-black/70" : isDisabled ? "text-[#A1A1AA]" : "text-[#A1A1AA]"}`}>
-                          {isDisabled ? "Ocupado" : "Disponible"}
+                          {isDisabled ? "No Disponible" : "Disponible"}
                         </p>
                       </button>
                     );

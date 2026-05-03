@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -268,15 +268,24 @@ function FacturacionTab() {
   const [stats, setStats] = useState(null);
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [desde, setDesde] = useState(() => { const d = new Date(); return d.toISOString().slice(0, 8) + "01"; });
   const [hasta, setHasta] = useState(() => new Date().toISOString().slice(0, 10));
 
-  useEffect(() => {
-    Promise.all([api.get("/reservas/facturacion"), api.get("/reservas")])
-      .then(([s, r]) => { setStats(s.data); setReservas(r.data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    const fetchData = async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    try {
+      const [s, r] = await Promise.all([api.get("/reservas/facturacion"), api.get("/reservas")]);
+      setStats(s.data);
+      setReservas(r.data);
+    } catch {}
+    finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#ccff00]" /></div>;
 
@@ -288,7 +297,7 @@ function FacturacionTab() {
 
   const totalFiltrado = movimientos
     .filter(r => r.estado === "CONFIRMADA" || r.estado === "COMPLETADA")
-    .reduce((sum, r) => sum + (r.precioTotal || 0), 0);
+    .reduce((sum, r) => sum + (r.estado === "COMPLETADA" ? (r.precioTotal || 0) : (r.sena || 0)), 0);
 
   return (
     <div className="space-y-6" data-testid="facturacion-panel">
@@ -371,7 +380,17 @@ function FacturacionTab() {
       {/* Tabla de movimientos */}
       <div className="bg-[#161618] border border-white/10 rounded-sm overflow-hidden">
         <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-white">Movimientos</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-white">Movimientos</h2>
+            <button
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+              className="p-1 rounded hover:bg-white/10 text-[#A1A1AA] hover:text-white transition-colors"
+              title="Actualizar datos"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            </button>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="bg-[#0A0A0A] border-white/10 text-white rounded-sm text-sm h-8 w-[120px] sm:w-[140px]" data-testid="fecha-desde" />
             <span className="text-[#A1A1AA] text-sm">a</span>
@@ -894,6 +913,10 @@ function AgendaTab({ canCrear = true, canCambiarEstado = true }) {
   const [nuevoEstado, setNuevoEstado] = useState("");
   const [savingEstado, setSavingEstado] = useState(false);
 
+  // Dialog: completar turno fijo (celda TURNO_FIJO)
+  const [dialogTurnoFijo, setDialogTurnoFijo] = useState(null); // { tf, slot }
+  const [savingTurnoFijo, setSavingTurnoFijo] = useState(false);
+
   useEffect(() => {
     Promise.all([
       api.get("/reservas"),
@@ -922,7 +945,7 @@ function AgendaTab({ canCrear = true, canCambiarEstado = true }) {
     if (bloq) return { status: "BLOQUEADO", data: bloq };
     const res = reservas.find(r => String(r.canchaId) === String(cancha.id) && r.fecha === fechaStr && norm(r.horaInicio) === slot.inicio && r.estado !== "CANCELADA");
     if (res) return { status: res.estado, data: res };
-    const tf = turnosFijos.find(t => String(t.canchaId) === String(cancha.id) && t.diaSemana === javaDay && norm(t.horaInicio) === slot.inicio && t.activo && (!t.fechaFin || t.fechaFin >= fechaStr));
+    const tf = turnosFijos.find(t => String(t.canchaId) === String(cancha.id) && t.diaSemana === javaDay && norm(t.horaInicio) === slot.inicio && t.activo && (!t.fechaInicio || t.fechaInicio <= fechaStr) && (!t.fechaFin || t.fechaFin >= fechaStr));
     if (tf) return { status: "TURNO_FIJO", data: tf };
     return { status: "LIBRE", data: null };
   }
@@ -961,6 +984,32 @@ function AgendaTab({ canCrear = true, canCambiarEstado = true }) {
       toast.error("Error al cambiar el estado");
     } finally {
       setSavingEstado(false);
+    }
+  }
+
+  async function handleCompletarTurnoFijo() {
+    if (!dialogTurnoFijo) return;
+    const { tf, slot } = dialogTurnoFijo;
+    setSavingTurnoFijo(true);
+    try {
+      // Crear la reserva para esta fecha específica
+      const { data: reserva } = await api.post("/reservas/crear-admin", {
+        canchaId: tf.canchaId,
+        fecha: fechaStr,
+        horaInicio: slot.inicio + ":00",
+        horaFin: slot.fin + ":00",
+        nombrePresencial: tf.usuarioNombre,
+      });
+      // Pasarla directo a COMPLETADA
+      await api.patch(`/reservas/estado/${reserva.id}?estado=COMPLETADA`);
+      setDialogTurnoFijo(null);
+      toast.success("Turno fijo marcado como completado");
+      api.get("/reservas").then(r => setReservas(r.data)).catch(() => {});
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.response?.data?.message || "Error al completar el turno";
+      toast.error(typeof msg === "string" ? msg : "Error al completar el turno");
+    } finally {
+      setSavingTurnoFijo(false);
     }
   }
 
@@ -1018,7 +1067,8 @@ function AgendaTab({ canCrear = true, canCambiarEstado = true }) {
                   const cell = getCellStatus(slot, cancha);
                   const s = CELL_STYLES[cell.status];
                   const clickable = (cell.status === "LIBRE" && canCrear) ||
-                    (["PENDIENTE", "CONFIRMADA", "COMPLETADA"].includes(cell.status) && canCambiarEstado);
+                    (["PENDIENTE", "CONFIRMADA", "COMPLETADA"].includes(cell.status) && canCambiarEstado) ||
+                    (cell.status === "TURNO_FIJO" && canCambiarEstado);
                   return (
                     <TableCell key={cancha.id} className="p-1">
                       <div
@@ -1026,6 +1076,8 @@ function AgendaTab({ canCrear = true, canCambiarEstado = true }) {
                           if (cell.status === "LIBRE") {
                             setNombreCliente("");
                             setDialogLibre({ slot, cancha });
+                          } else if (cell.status === "TURNO_FIJO") {
+                            setDialogTurnoFijo({ tf: cell.data, slot });
                           } else {
                             setNuevoEstado(cell.data.estado);
                             setDialogOcupada(cell.data);
@@ -1072,6 +1124,40 @@ function AgendaTab({ canCrear = true, canCambiarEstado = true }) {
             <Button className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-semibold rounded-sm" onClick={handleCrearReserva} disabled={!nombreCliente.trim() || savingLibre}>
               {savingLibre ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirmar reserva
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: completar turno fijo */}
+      <Dialog open={dialogTurnoFijo !== null} onOpenChange={(o) => !o && setDialogTurnoFijo(null)}>
+        <DialogContent className="bg-[#161618] border-white/10 rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white">Turno fijo</DialogTitle>
+            <DialogDescription className="text-[#A1A1AA]">Marcar como completado para esta fecha</DialogDescription>
+          </DialogHeader>
+          {dialogTurnoFijo && (
+            <div className="space-y-4 py-1">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <span className="text-[#A1A1AA]">Cliente</span>
+                <span className="text-white font-medium">{dialogTurnoFijo.tf.usuarioNombre}</span>
+                <span className="text-[#A1A1AA]">Cancha</span>
+                <span className="text-white">{dialogTurnoFijo.tf.canchaNombre}</span>
+                <span className="text-[#A1A1AA]">Fecha</span>
+                <span className="text-white font-mono-accent">{fechaStr}</span>
+                <span className="text-[#A1A1AA]">Horario</span>
+                <span className="text-white font-mono-accent">{dialogTurnoFijo.slot.inicio} – {dialogTurnoFijo.slot.fin}</span>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-sm px-3 py-2 text-xs text-blue-300">
+                Al confirmar se creará una reserva para esta fecha y se registrará como completada en la facturación.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" className="border-white/10 text-white hover:bg-white/10" onClick={() => setDialogTurnoFijo(null)}>Cancelar</Button>
+            <Button className="bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-sm" onClick={handleCompletarTurnoFijo} disabled={savingTurnoFijo}>
+              {savingTurnoFijo ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Marcar como completada
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1150,7 +1236,10 @@ function TurnosFijosTab() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ usuarioId: "", canchaId: "", diaSemana: "", horaInicio: "", horaFin: "", fechaFin: "" });
+  const [form, setForm] = useState({ usuarioId: "", canchaId: "", diaSemana: "", horaInicio: "", horaFin: "", fechaInicio: "", fechaFin: "" });
+  const [userSearch, setUserSearch] = useState("");
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const userSearchRef = useRef(null);
 
   const fetchTurnos = () => {
     setLoading(true);
@@ -1173,7 +1262,7 @@ function TurnosFijosTab() {
       await api.post("/turnos-fijos", form);
       toast.success("Turno fijo creado!");
       setShowForm(false);
-      setForm({ usuarioId: "", canchaId: "", diaSemana: "", horaInicio: "", horaFin: "", fechaFin: "" });
+      setForm({ usuarioId: "", canchaId: "", diaSemana: "", horaInicio: "", horaFin: "", fechaInicio: "", fechaFin: "" });
       fetchTurnos();
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.detail || "Error al crear turno fijo");
@@ -1256,13 +1345,14 @@ function TurnosFijosTab() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {t.fechaFin ? (
-                      <span className={`font-mono-accent ${vencido ? "text-red-400" : "text-[#A1A1AA]"}`}>
-                        Hasta {t.fechaFin}
-                      </span>
-                    ) : (
-                      <span className="text-[#A1A1AA]">Indefinido</span>
-                    )}
+                    <div className="space-y-0.5">
+                      <p className="text-[#A1A1AA] font-mono-accent text-xs">
+                        Desde: <span className="text-white">{t.fechaInicio || "hoy"}</span>
+                      </p>
+                      <p className={`font-mono-accent text-xs ${vencido ? "text-red-400" : "text-[#A1A1AA]"}`}>
+                        Hasta: <span className={vencido ? "text-red-400" : "text-white"}>{t.fechaFin || "indefinido"}</span>
+                      </p>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge className={`rounded-sm text-xs ${t.activo && !vencido ? "bg-[#ccff00]/10 text-[#ccff00] border-[#ccff00]/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
@@ -1298,21 +1388,60 @@ function TurnosFijosTab() {
             <DialogDescription className="text-[#A1A1AA]">Asignar un turno semanal recurrente a un usuario</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {/* Usuario */}
-            <div>
+            {/* Usuario — combobox con búsqueda */}
+            <div className="relative">
               <Label className="text-[#A1A1AA] text-xs uppercase tracking-wider mb-2 block">Usuario</Label>
-              <Select value={String(form.usuarioId)} onValueChange={v => setForm(f => ({ ...f, usuarioId: Number(v) }))}>
-                <SelectTrigger className="bg-[#0A0A0A] border-white/10 text-white rounded-sm">
-                  <SelectValue placeholder="Seleccionar usuario" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#161618] border-white/10">
-                  {usuarios.filter(u => u.activo !== false).map(u => (
-                    <SelectItem key={u.id} value={String(u.id)} className="text-white focus:bg-white/5 focus:text-white">
-                      {u.nombre} ({u.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div
+                className="bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 flex items-center justify-between cursor-text"
+                onClick={() => { setUserDropdownOpen(true); setTimeout(() => userSearchRef.current?.focus(), 50); }}
+              >
+                {userDropdownOpen ? (
+                  <input
+                    ref={userSearchRef}
+                    value={userSearch}
+                    onChange={e => { setUserSearch(e.target.value); setUserDropdownOpen(true); }}
+                    onBlur={() => setTimeout(() => setUserDropdownOpen(false), 150)}
+                    placeholder="Buscar usuario..."
+                    className="bg-transparent text-white text-sm outline-none w-full placeholder:text-[#A1A1AA]"
+                  />
+                ) : (
+                  <span className={`text-sm ${form.usuarioId ? "text-white" : "text-[#A1A1AA]"}`}>
+                    {form.usuarioId
+                      ? (() => { const u = usuarios.find(u => u.id === form.usuarioId); return u ? `${u.nombre} (${u.email})` : "Seleccionar usuario"; })()
+                      : "Seleccionar usuario"}
+                  </span>
+                )}
+                <svg className="h-4 w-4 text-[#A1A1AA] flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+              {userDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-[#161618] border border-white/10 rounded-sm shadow-lg max-h-48 overflow-y-auto">
+                  {usuarios
+                    .filter(u => u.activo !== false)
+                    .filter(u => {
+                      const q = userSearch.toLowerCase();
+                      return !q || u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                    })
+                    .map(u => (
+                      <div
+                        key={u.id}
+                        onMouseDown={() => {
+                          setForm(f => ({ ...f, usuarioId: u.id }));
+                          setUserSearch("");
+                          setUserDropdownOpen(false);
+                        }}
+                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 ${form.usuarioId === u.id ? "text-[#ccff00]" : "text-white"}`}
+                      >
+                        {u.nombre} <span className="text-[#A1A1AA] text-xs">({u.email})</span>
+                      </div>
+                    ))}
+                  {usuarios.filter(u => u.activo !== false).filter(u => {
+                    const q = userSearch.toLowerCase();
+                    return !q || u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div className="px-3 py-2 text-sm text-[#A1A1AA]">Sin resultados</div>
+                  )}
+                </div>
+              )}
             </div>
             {/* Cancha */}
             <div>
@@ -1369,18 +1498,30 @@ function TurnosFijosTab() {
                 <Input value={form.horaFin} disabled className="bg-[#0A0A0A] border-white/10 text-[#A1A1AA] rounded-sm" />
               </div>
             </div>
-            {/* Fecha fin */}
-            <div>
-              <Label className="text-[#A1A1AA] text-xs uppercase tracking-wider mb-2 block">Vigente hasta (opcional)</Label>
-              <Input
-                type="date"
-                value={form.fechaFin}
-                onChange={e => setForm(f => ({ ...f, fechaFin: e.target.value }))}
-                min={new Date().toISOString().split("T")[0]}
-                className="bg-[#0A0A0A] border-white/10 text-white rounded-sm [color-scheme:dark]"
-                placeholder="Dejar vacio = indefinido"
-              />
-              <p className="text-[10px] text-[#A1A1AA] mt-1">Si no se define, el turno fijo se repite indefinidamente</p>
+            {/* Fechas inicio / fin */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-[#A1A1AA] text-xs uppercase tracking-wider mb-2 block">Vigente desde (opcional)</Label>
+                <Input
+                  type="date"
+                  value={form.fechaInicio}
+                  onChange={e => setForm(f => ({ ...f, fechaInicio: e.target.value }))}
+                  min={new Date().toISOString().split("T")[0]}
+                  className="bg-[#0A0A0A] border-white/10 text-white rounded-sm [color-scheme:dark]"
+                />
+                <p className="text-[10px] text-[#A1A1AA] mt-1">Vacío = empieza hoy</p>
+              </div>
+              <div>
+                <Label className="text-[#A1A1AA] text-xs uppercase tracking-wider mb-2 block">Vigente hasta (opcional)</Label>
+                <Input
+                  type="date"
+                  value={form.fechaFin}
+                  onChange={e => setForm(f => ({ ...f, fechaFin: e.target.value }))}
+                  min={form.fechaInicio || new Date().toISOString().split("T")[0]}
+                  className="bg-[#0A0A0A] border-white/10 text-white rounded-sm [color-scheme:dark]"
+                />
+                <p className="text-[10px] text-[#A1A1AA] mt-1">Vacío = sin fecha de vencimiento</p>
+              </div>
             </div>
           </div>
           <DialogFooter>

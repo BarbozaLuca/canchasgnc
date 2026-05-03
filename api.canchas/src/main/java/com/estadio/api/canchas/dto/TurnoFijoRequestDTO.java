@@ -29,5 +29,8 @@ public class TurnoFijoRequestDTO {
     private String horaFin;    // "22:00"
 
     @Pattern(regexp = "^$|^\\d{4}-\\d{2}-\\d{2}$", message = "Formato de fecha inválido (yyyy-MM-dd)")
-    private String fechaFin;   // "2026-04-30" (opcional, null = indefinido)
+    private String fechaInicio; // "2026-05-05" (opcional, null = desde hoy)
+
+    @Pattern(regexp = "^$|^\\d{4}-\\d{2}-\\d{2}$", message = "Formato de fecha inválido (yyyy-MM-dd)")
+    private String fechaFin;    // "2026-12-31" (opcional, null = indefinido)
 }

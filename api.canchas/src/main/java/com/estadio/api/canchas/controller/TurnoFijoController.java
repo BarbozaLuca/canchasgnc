@@ -60,9 +60,16 @@ public class TurnoFijoController {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Ya existe un turno fijo para esa cancha, dia y horario.");
         }
+        LocalDate fechaInicio = req.getFechaInicio() != null && !req.getFechaInicio().isBlank()
+                ? LocalDate.parse(req.getFechaInicio()) : LocalDate.now();
 
         LocalDate fechaFin = req.getFechaFin() != null && !req.getFechaFin().isBlank()
                 ? LocalDate.parse(req.getFechaFin()) : null;
+
+        if (fechaFin != null && fechaFin.isBefore(fechaInicio)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La fecha de fin no puede ser anterior a la fecha de inicio.");
+        }
 
         TurnoFijo turno = new TurnoFijo();
         turno.setUsuario(usuario);
@@ -70,6 +77,7 @@ public class TurnoFijoController {
         turno.setDiaSemana(dia);
         turno.setHoraInicio(horaInicio);
         turno.setHoraFin(horaFin);
+        turno.setFechaInicio(fechaInicio);
         turno.setFechaFin(fechaFin);
         turno.setActivo(true);
         turno.setCreatedAt(LocalDateTime.now());
@@ -106,6 +114,7 @@ public class TurnoFijoController {
         dto.setDiaSemana(t.getDiaSemana().name());
         dto.setHoraInicio(t.getHoraInicio());
         dto.setHoraFin(t.getHoraFin());
+        dto.setFechaInicio(t.getFechaInicio() != null ? t.getFechaInicio().toString() : null);
         dto.setFechaFin(t.getFechaFin() != null ? t.getFechaFin().toString() : null);
         dto.setActivo(t.isActivo());
         dto.setCreatedAt(t.getCreatedAt() != null ? t.getCreatedAt().toString() : null);

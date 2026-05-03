@@ -34,6 +34,9 @@ public class TurnoFijo {
     @Column(nullable = false)
     private LocalTime horaFin;
 
+    // Fecha desde la cual el turno fijo entra en vigencia (null = desde hoy)
+    private LocalDate fechaInicio;
+
     // Fecha hasta la cual se generan reservas (null = indefinido)
     private LocalDate fechaFin;
 

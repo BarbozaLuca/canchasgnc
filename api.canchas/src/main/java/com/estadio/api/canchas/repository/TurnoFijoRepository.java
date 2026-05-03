@@ -18,6 +18,7 @@ public interface TurnoFijoRepository extends JpaRepository<TurnoFijo, Long> {
     @Query("""
             SELECT t FROM TurnoFijo t
             WHERE t.activo = true
+              AND (t.fechaInicio IS NULL OR t.fechaInicio <= :fecha)
               AND (t.fechaFin IS NULL OR t.fechaFin >= :fecha)
             """)
     List<TurnoFijo> findVigentes(@Param("fecha") LocalDate fecha);
@@ -28,6 +29,7 @@ public interface TurnoFijoRepository extends JpaRepository<TurnoFijo, Long> {
             WHERE t.cancha.id = :canchaId
               AND t.diaSemana = :diaSemana
               AND t.activo = true
+              AND (t.fechaInicio IS NULL OR t.fechaInicio <= :fecha)
               AND (t.fechaFin IS NULL OR t.fechaFin >= :fecha)
             """)
     List<TurnoFijo> findVigentesByCanchaAndDia(
@@ -42,6 +44,7 @@ public interface TurnoFijoRepository extends JpaRepository<TurnoFijo, Long> {
               AND t.diaSemana = :diaSemana
               AND t.horaInicio = :horaInicio
               AND t.activo = true
+              AND (t.fechaInicio IS NULL OR t.fechaInicio <= :hoy)
               AND (t.fechaFin IS NULL OR t.fechaFin >= :hoy)
             """)
     boolean existeConflicto(

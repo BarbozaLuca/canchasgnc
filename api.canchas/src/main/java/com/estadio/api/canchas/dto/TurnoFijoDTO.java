@@ -16,6 +16,7 @@ public class TurnoFijoDTO {
     private String diaSemana;
     private LocalTime horaInicio;
     private LocalTime horaFin;
+    private String fechaInicio;
     private String fechaFin;
     private boolean activo;
     private String createdAt;

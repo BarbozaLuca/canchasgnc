@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +16,8 @@ const STATUS_MAP = {
 const timeLabel = (r) => `${r.horaInicio} - ${r.horaFin}`;
 
 // Hook para countdown en tiempo real
-function useCountdown(expiresAt) {
-  const [timeLeft, setTimeLeft] = useState(() => calcTimeLeft(expiresAt));
+function useCountdown(expiresAt, onExpire) {
+  const firedRef = useRef(false);
 
   function calcTimeLeft(exp) {
     if (!exp) return null;
@@ -25,13 +25,21 @@ function useCountdown(expiresAt) {
     return diff > 0 ? diff : 0;
   }
 
+  const [timeLeft, setTimeLeft] = useState(() => calcTimeLeft(expiresAt));
+
   useEffect(() => {
     if (!expiresAt) return;
+    firedRef.current = false;
     const interval = setInterval(() => {
-      setTimeLeft(calcTimeLeft(expiresAt));
+      const left = calcTimeLeft(expiresAt);
+      setTimeLeft(left);
+      if (left <= 0 && !firedRef.current) {
+        firedRef.current = true;
+        onExpire?.();
+      }
     }, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt]);
+  }, [expiresAt, onExpire]);
 
   if (timeLeft === null) return null;
   if (timeLeft <= 0) return { minutes: 0, seconds: 0, expired: true };
@@ -41,8 +49,8 @@ function useCountdown(expiresAt) {
 }
 
 // Componente que muestra el countdown para una reserva pendiente
-function CountdownBadge({ expiresAt }) {
-  const countdown = useCountdown(expiresAt);
+function CountdownBadge({ expiresAt, onExpire }) {
+  const countdown = useCountdown(expiresAt, onExpire);
   if (!countdown) return null;
   if (countdown.expired) return (
     <span className="text-red-400 text-xs font-mono-accent flex items-center gap-1">
@@ -69,10 +77,10 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("activas");
 
-  const fetchReservas = () => {
+  const fetchReservas = useCallback(() => {
     setLoading(true);
     api.get("/reservas/mis-reservas").then(r => { setReservas(r.data); setLoading(false); }).catch(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => { fetchReservas(); }, []);
 
@@ -189,7 +197,7 @@ export default function MyBookings() {
                             {status.label}
                           </Badge>
                           {r.estado === "PENDIENTE" && r.expiresAt && (
-                            <CountdownBadge expiresAt={r.expiresAt} />
+                            <CountdownBadge expiresAt={r.expiresAt} onExpire={fetchReservas} />
                           )}
                         </div>
                       </TableCell>
@@ -232,7 +240,7 @@ export default function MyBookings() {
                         {status.label}
                       </Badge>
                       {r.estado === "PENDIENTE" && r.expiresAt && (
-                        <CountdownBadge expiresAt={r.expiresAt} />
+                        <CountdownBadge expiresAt={r.expiresAt} onExpire={fetchReservas} />
                       )}
                     </div>
                   </div>
