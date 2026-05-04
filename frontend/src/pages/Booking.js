@@ -273,9 +273,17 @@ export default function Booking() {
                   <span className="text-sm text-[#A1A1AA] shrink-0">Fecha y hora</span>
                   <span className="text-white font-mono-accent text-sm text-right">{date && format(date, "dd/MM/yyyy")} · {timeLabel(bookingResult.horaInicio, horarios)}</span>
                 </div>
-                <div className="flex items-center justify-between border-t border-white/10 pt-3">
-                  <span className="text-sm text-[#A1A1AA]">Seña a pagar</span>
-                  <span className="text-[#ccff00] font-mono-accent font-bold text-xl">${bookingResult.sena?.toLocaleString()}</span>
+                <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                  <span className="text-sm text-[#A1A1AA]">Seña base</span>
+                  <span className="text-white font-mono-accent">${bookingResult.sena?.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[#A1A1AA]">Recargo que cobra MP (5,3%)</span>
+                  <span className="text-white font-mono-accent">+${(bookingResult.senaMp - bookingResult.sena)?.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-white/10 pt-3 mt-1">
+                  <span className="text-sm font-semibold text-[#A1A1AA]">Total a pagar (MP)</span>
+                  <span className="text-[#ccff00] font-mono-accent font-bold text-xl">${bookingResult.senaMp?.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -362,10 +370,32 @@ export default function Booking() {
               <span className="text-[#A1A1AA]">Precio total</span>
               <span className="text-white font-bold font-mono-accent">${cancha?.precio_hora?.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between">
+            {/* <div className="flex justify-between">
               <span className="text-[#A1A1AA]">Seña a pagar (MP)</span>
               <span className="text-[#ccff00] font-bold font-mono-accent text-lg">${Math.round(cancha?.precio_hora * 0.5)?.toLocaleString()}</span>
-            </div>
+            </div> */}
+            {(() => {
+              const precioHora = cancha?.precio_hora ?? 0; 
+              const base = precioHora / 2;
+              const total = Math.round(base / (1 - 0.053119) * 100) / 100;
+              const recargo = Math.round((total - base) * 100) / 100;
+              return (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#A1A1AA]">Seña base</span>
+                    <span className="text-white font-mono-accent">${base?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#A1A1AA]">Recargo que cobra MP (5,3%)</span>
+                    <span className="text-white font-mono-accent">+${recargo?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/10 pt-2 mt-1">
+                    <span className="text-[#A1A1AA] font-semibold">Total a pagar (MP)</span>
+                    <span className="text-[#ccff00] font-bold font-mono-accent text-lg">${total?.toLocaleString()}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowDialog(false)} className="border-white/20 text-white hover:bg-white/5 rounded-sm w-full sm:w-auto" data-testid="cancel-dialog-btn">
@@ -377,6 +407,6 @@ export default function Booking() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div> 
   );
 }

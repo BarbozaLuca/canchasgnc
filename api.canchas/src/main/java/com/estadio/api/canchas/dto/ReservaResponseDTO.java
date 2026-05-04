@@ -27,6 +27,7 @@ public class ReservaResponseDTO {
     private BigDecimal precioTotal;
 
     private BigDecimal sena;
+    private BigDecimal senaMp;
     private String estado;
     private String comprobante;
     private String comprobanteUrl;

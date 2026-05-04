@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -23,6 +25,14 @@ import java.util.List;
 public class MercadoPagoService {
 
     private static final Logger log = LoggerFactory.getLogger(MercadoPagoService.class);
+
+    /**
+     * Tasa total de Mercado Pago trasladada al jugador.
+     * Comisión "Al instante": 4,4 %  +  IVA (21 % sobre la comisión) = 4,4 × 1,21 = 5,324 %
+     * Se usa la fórmula de "recibir neto": senaMp = sena / (1 − TASA)
+     * así el dueño recibe exactamente `sena` después de que MP descuenta su fee.
+     */
+    public static final BigDecimal TASA_MP = new BigDecimal("0.053119"); // 4,4 % × 1,21
 
     private final ConfigPagoService configPagoService;
 
@@ -82,6 +92,10 @@ public class MercadoPagoService {
 
             PreferenceClient client = new PreferenceClient();
 
+            // Monto real que paga el jugador: sena / (1 − tasa) → el dueño recibe sena neta
+            BigDecimal senaMp = reserva.getSena()
+                    .divide(BigDecimal.ONE.subtract(TASA_MP), 2, RoundingMode.HALF_UP);
+
             // Item: la seña del turno
             PreferenceItemRequest item = PreferenceItemRequest.builder()
                     .id("reserva-" + reserva.getId())
@@ -89,7 +103,7 @@ public class MercadoPagoService {
                             + " | " + reserva.getFecha() + " " + reserva.getHoraInicio()
                             + "-" + reserva.getHoraFin())
                     .quantity(1)
-                    .unitPrice(reserva.getSena())
+                    .unitPrice(senaMp)
                     .currencyId("ARS")
                     .build();
 

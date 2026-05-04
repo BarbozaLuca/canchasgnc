@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  * Limpieza programada de datos obsoletos:
  * - Tokens de verificacion de email vencidos
  * - Tokens de recuperacion de password vencidos
- * - Notificaciones de mas de 3 dias
+ * - Notificaciones de mas de 2 dias
  */
 @Component
 @RequiredArgsConstructor
@@ -36,7 +36,7 @@ public class TokenCleanupScheduler {
 
         long verificacion = emailVerificationTokenRepository.deleteByExpiracionBefore(ahora);
         long reset = passwordResetTokenRepository.deleteByExpiracionBefore(ahora);
-        long notificaciones = notificacionRepository.deleteByCreatedAtBefore(ahora.minusDays(3));
+        long notificaciones = notificacionRepository.deleteByCreatedAtBefore(ahora.minusDays(2));
 
         if (verificacion > 0 || reset > 0 || notificaciones > 0) {
             log.info("Limpieza diaria: {} tokens verificacion + {} tokens reset + {} notificaciones eliminados",

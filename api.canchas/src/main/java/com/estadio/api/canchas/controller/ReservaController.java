@@ -296,6 +296,9 @@ public class ReservaController {
 
             ReservaResponseDTO responseDto = convertToDto(reserva);
             responseDto.setMpInitPoint(preference.getInitPoint());
+            // Informar al frontend el monto real con recargo de pasarela (fórmula neta)
+            responseDto.setSenaMp(reserva.getSena()
+                    .divide(java.math.BigDecimal.ONE.subtract(MercadoPagoService.TASA_MP), 2, java.math.RoundingMode.HALF_UP));
             return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
         } catch (Exception e) {
             // Log del error real para diagnóstico
