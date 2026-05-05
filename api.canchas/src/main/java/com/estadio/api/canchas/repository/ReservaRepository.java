@@ -3,6 +3,7 @@ package com.estadio.api.canchas.repository;
 import com.estadio.api.canchas.model.EstadoReserva;
 import com.estadio.api.canchas.model.Reserva;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -63,4 +64,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     List<Reserva> findParaRecordatorio(@Param("fecha") LocalDate fecha,
                                        @Param("horaDesde") LocalTime horaDesde,
                                        @Param("horaHasta") LocalTime horaHasta);
+
+    // Elimina reservas cuya fecha es anterior a la fecha límite (limpieza mensual)
+    @Modifying
+    @Query("DELETE FROM Reserva r WHERE r.fecha < :fechaLimite")
+    int deleteByFechaAntesDe(@Param("fechaLimite") LocalDate fechaLimite);
 }

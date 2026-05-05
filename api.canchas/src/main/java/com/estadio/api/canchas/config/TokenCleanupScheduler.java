@@ -3,6 +3,7 @@ package com.estadio.api.canchas.config;
 import com.estadio.api.canchas.repository.EmailVerificationTokenRepository;
 import com.estadio.api.canchas.repository.NotificacionRepository;
 import com.estadio.api.canchas.repository.PasswordResetTokenRepository;
+import com.estadio.api.canchas.repository.ReservaRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -27,6 +29,7 @@ public class TokenCleanupScheduler {
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final NotificacionRepository notificacionRepository;
+    private final ReservaRepository reservaRepository;
 
     // Se ejecuta cada 24 horas
     @Scheduled(fixedRate = 86_400_000L) // 24 h en ms
@@ -41,6 +44,17 @@ public class TokenCleanupScheduler {
         if (verificacion > 0 || reset > 0 || notificaciones > 0) {
             log.info("Limpieza diaria: {} tokens verificacion + {} tokens reset + {} notificaciones eliminados",
                     verificacion, reset, notificaciones);
+        }
+    }
+
+    // Se ejecuta todos los días a las 04:00
+    @Scheduled(cron = "0 0 4 * * *")
+    @Transactional
+    public void eliminarReservasAntiguas() {
+        LocalDate fechaLimite = LocalDate.now().minusMonths(1);
+        int eliminadas = reservaRepository.deleteByFechaAntesDe(fechaLimite);
+        if (eliminadas > 0) {
+            log.info("Limpieza mensual: {} reservas anteriores a {} eliminadas", eliminadas, fechaLimite);
         }
     }
 }
