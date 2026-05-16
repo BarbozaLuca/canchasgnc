@@ -2,17 +2,8 @@ package com.estadio.api.canchas.service.impl;
 
 import com.estadio.api.canchas.dto.FacturacionDTO;
 import com.estadio.api.canchas.dto.ReservaRequestDTO;
-import com.estadio.api.canchas.model.Cancha;
-import com.estadio.api.canchas.model.EstadoReserva;
-import com.estadio.api.canchas.model.Reserva;
-import com.estadio.api.canchas.model.User;
-import com.estadio.api.canchas.model.Notificacion;
-import com.estadio.api.canchas.model.TurnoFijo;
-import com.estadio.api.canchas.repository.CanchaRepository;
-import com.estadio.api.canchas.repository.NotificacionRepository;
-import com.estadio.api.canchas.repository.ReservaRepository;
-import com.estadio.api.canchas.repository.TurnoFijoRepository;
-import com.estadio.api.canchas.repository.UserRepository;
+import com.estadio.api.canchas.model.*;
+import com.estadio.api.canchas.repository.*;
 import com.estadio.api.canchas.service.IReservaService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -44,6 +35,7 @@ public class ReservaServiceImpl implements IReservaService {
     private final UserRepository userRepository;
     private final NotificacionRepository notificacionRepository;
     private final TurnoFijoRepository turnoFijoRepository;
+    private final DescuentoRepository descuentoRepository;
     private final com.estadio.api.canchas.service.EmailService emailService;
 
     private java.util.List<String> getStaffAndAdminEmails() {
@@ -132,14 +124,22 @@ public class ReservaServiceImpl implements IReservaService {
                     "El horario solicitado ya está ocupado para esa cancha.");
         }
 
-        // Cálculo del precio en el servidor (no se acepta del cliente)
+        // Cálculo de horas (maneja turnos que cruzan medianoche)
         long minutos = Duration.between(dto.getHoraInicio(), dto.getHoraFin()).toMinutes();
-        // Si cruza medianoche (ej: 23:00→00:00 = -1380 min), sumar 24hs (1440 min)
         if (minutos <= 0) {
             minutos += 1440;
         }
         BigDecimal horas = BigDecimal.valueOf(minutos).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
-        BigDecimal precioTotal = cancha.getPrecioHora().multiply(horas).setScale(2, RoundingMode.HALF_UP);
+
+        // Aplicar descuento si existe para este slot
+        BigDecimal precioBase = cancha.getPrecioHora().setScale(2, RoundingMode.HALF_UP);
+        Optional<Descuento> descuento = descuentoRepository
+                .findByCanchaIdAndFechaAndHoraInicio(cancha.getId(), dto.getFecha(), dto.getHoraInicio());
+        BigDecimal precioPorHora = descuento
+                .map(d -> precioBase.multiply(BigDecimal.valueOf(100 - d.getPorcentaje()))
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP))
+                .orElse(precioBase);
+        BigDecimal precioTotal = precioPorHora.multiply(horas).setScale(2, RoundingMode.HALF_UP);
 
         // Regla de negocio: la seña es siempre el 50% del precio total
         BigDecimal sena = precioTotal.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);

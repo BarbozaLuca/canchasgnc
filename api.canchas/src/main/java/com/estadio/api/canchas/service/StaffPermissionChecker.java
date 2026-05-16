@@ -33,6 +33,8 @@ public class StaffPermissionChecker {
             case "GESTIONAR_BLOQUEOS"  -> user.isPuedeGestionarBloqueos();
             case "GESTIONAR_TURNOS"    -> user.isPuedeGestionarTurnosFijos();
             case "VER_FACTURACION"     -> user.isPuedeVerFacturacion();
+            case "GESTIONAR_DESCUENTOS" -> user.isPuedeGestionarDescuentos();
+            case "PUBLICAR_TURNOS" -> user.isPuedePublicarTurnos();
             default -> false;
         };
     }

@@ -5,20 +5,9 @@ import com.estadio.api.canchas.dto.DisponibilidadResponseDTO;
 import com.estadio.api.canchas.dto.HorarioSlotDTO;
 import com.estadio.api.canchas.dto.ReservaRequestDTO;
 import com.estadio.api.canchas.dto.ReservaResponseDTO;
-import com.estadio.api.canchas.model.BloqueoHorario;
-import com.estadio.api.canchas.model.ConfigPago;
-import com.estadio.api.canchas.model.EstadoReserva;
-import com.estadio.api.canchas.model.Notificacion;
-import com.estadio.api.canchas.model.Reserva;
-import com.estadio.api.canchas.model.User;
-import com.estadio.api.canchas.repository.BloqueoHorarioRepository;
-import com.estadio.api.canchas.repository.DiaNoLaborableRepository;
-import com.estadio.api.canchas.repository.NotificacionRepository;
-import com.estadio.api.canchas.repository.TurnoFijoRepository;
-import com.estadio.api.canchas.service.ConfigPagoService;
-import com.estadio.api.canchas.service.IReservaService;
-import com.estadio.api.canchas.service.IUserService;
-import com.estadio.api.canchas.service.MercadoPagoService;
+import com.estadio.api.canchas.model.*;
+import com.estadio.api.canchas.repository.*;
+import com.estadio.api.canchas.service.*;
 import com.mercadopago.resources.preference.Preference;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -54,11 +45,13 @@ public class ReservaController {
     private final IReservaService reservaService;
     private final IUserService userService;
     private final ConfigPagoService configPagoService;
+    private final ICanchaService canchaService;
     private final MercadoPagoService mercadoPagoService;
     private final BloqueoHorarioRepository bloqueoHorarioRepository;
     private final DiaNoLaborableRepository diaNoLaborableRepository;
     private final TurnoFijoRepository turnoFijoRepository;
     private final NotificacionRepository notificacionRepository;
+    private final DescuentoRepository descuentoRepository;
 
     @Value("${pago.limite.minutos}")
     private int limiteMinutos;
@@ -114,7 +107,7 @@ public class ReservaController {
         if (esDiaNoLaborable) {
             List<HorarioSlotDTO> horarios = new ArrayList<>();
             for (LocalTime[] slot : slots) {
-                horarios.add(new HorarioSlotDTO(slot[0].toString(), slot[1].toString(), false));
+                horarios.add(new HorarioSlotDTO(slot[0].toString(), slot[1].toString(), false, false, null, null));
             }
             return ResponseEntity.ok(new DisponibilidadResponseDTO(horarios));
         }
@@ -142,6 +135,17 @@ public class ReservaController {
                 .map(com.estadio.api.canchas.model.TurnoFijo::getHoraInicio)
                 .collect(Collectors.toSet());
 
+        // Descuentos activos para esta cancha y fecha
+        Map<LocalTime, Descuento> descuentosPorHora = descuentoRepository
+                .findByCanchaIdAndFecha(canchaId, fecha)
+                .stream()
+                .collect(Collectors.toMap(Descuento::getHoraInicio, d -> d));
+
+        // Precio base del turno (para calcular precio con descuento)
+        BigDecimal precioBase = canchaService.findById(canchaId)
+                .map(c -> c.getPrecioHora())
+                .orElse(BigDecimal.ZERO);
+
         boolean esHoy = fecha.equals(LocalDate.now());
         LocalTime ahora = LocalTime.now();
         // horaApertura sirve para detectar slots post-medianoche (ej: 00:00, 01:00 en un
@@ -156,7 +160,21 @@ public class ReservaController {
                     || horasBloqueadas.contains(slot[0])
                     || horasTurnoFijo.contains(slot[0])
                     || (esHoy && !esSlotPostMedianoche && !slot[0].isAfter(ahora)); // turnos pasados hoy (excluye post-medianoche)
-            horarios.add(new HorarioSlotDTO(slot[0].toString(), slot[1].toString(), !ocupado));
+            Descuento descuento = descuentosPorHora.get(slot[0]);
+            boolean tieneDescuento = descuento != null;
+            Integer porcentaje = tieneDescuento ? descuento.getPorcentaje() : null;
+            BigDecimal precioConDescuento = tieneDescuento
+                    ? precioBase.multiply(BigDecimal.valueOf(100 - porcentaje)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                    : null;
+
+            HorarioSlotDTO slotDTO = new HorarioSlotDTO();
+            slotDTO.setHoraInicio(slot[0].toString());
+            slotDTO.setHoraFin(slot[1].toString());
+            slotDTO.setDisponible(!ocupado);
+            slotDTO.setTieneDescuento(tieneDescuento);
+            slotDTO.setPorcentajeDescuento(porcentaje);
+            slotDTO.setPrecioConDescuento(precioConDescuento);
+            horarios.add(slotDTO);
         }
 
         return ResponseEntity.ok(new DisponibilidadResponseDTO(horarios));

@@ -1,5 +1,11 @@
 /* GNC Custom Styles */
 
+/* Date inputs — forzar esquema oscuro para que el texto sea blanco */
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark;
+}
+
 /* Glass header */
 .glass-header {
   backdrop-filter: blur(20px);

@@ -106,6 +106,8 @@ public class UserController {
         user.setPuedeGestionarBloqueos(dto.isPuedeGestionarBloqueos());
         user.setPuedeGestionarTurnosFijos(dto.isPuedeGestionarTurnosFijos());
         user.setPuedeVerFacturacion(dto.isPuedeVerFacturacion());
+        user.setPuedeGestionarDescuentos(dto.isPuedeGestionarDescuentos());
+        user.setPuedePublicarTurnos(dto.isPuedePublicarTurnos());
 
         return ResponseEntity.ok(convertToDto(userService.save(user)));
     }
@@ -142,7 +144,10 @@ public class UserController {
         dto.setPuedeCambiarEstado(user.isPuedeCambiarEstado());
         dto.setPuedeGestionarBloqueos(user.isPuedeGestionarBloqueos());
         dto.setPuedeGestionarTurnosFijos(user.isPuedeGestionarTurnosFijos());
+        dto.setPuedeGestionarDescuentos(user.isPuedeGestionarDescuentos());
         dto.setPuedeVerFacturacion(user.isPuedeVerFacturacion());
+        dto.setPuedePublicarTurnos(user.isPuedePublicarTurnos());
+
         return dto;
     }
 }

@@ -31,4 +31,6 @@ public class UserDTO {
     private boolean puedeGestionarBloqueos;
     private boolean puedeGestionarTurnosFijos;
     private boolean puedeVerFacturacion;
+    private boolean puedeGestionarDescuentos;
+    private boolean puedePublicarTurnos;
 }

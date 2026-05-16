@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, ArrowLeft, CalendarDays, Clock, CreditCard, Timer, AlertCircle, ExternalLink, Phone } from "lucide-react";
+import { Loader2, ArrowLeft, CalendarDays, Clock, CreditCard, Timer, AlertCircle, ExternalLink, Phone, Tag } from "lucide-react";
 import HowToBook from "@/components/HowToBook";
 
 // Genera label "HH:MM - HH:MM" a partir de horaInicio
@@ -175,24 +175,43 @@ export default function Booking() {
                   {horarios.filter(slot => slot.disponible).map(slot => {
                     const isSelected = selected?.horaInicio === slot.horaInicio;
                     const isDisabled = false;
+                    const tieneDescuento = slot.tieneDescuento && slot.porcentajeDescuento > 0;
                     return (
                       <button
                         key={slot.horaInicio}
                         onClick={() => !isDisabled && setSelected(slot)}
                         disabled={isDisabled}
                         data-testid={`slot-${slot.horaInicio.replace(":", "")}`}
-                        className={`time-slot rounded-sm border px-3 py-3 sm:px-4 sm:py-4 text-center transition-all ${
+                        className={`time-slot relative rounded-sm border px-3 py-3 sm:px-4 sm:py-4 text-center transition-all ${
                           isSelected ? "time-slot-selected"
                           : isDisabled ? "time-slot-disabled border-white/20 text-[#A1A1AA]/60"
+                          : tieneDescuento ? "border-[#ccff00]/40 text-white hover:border-[#ccff00] hover:bg-[#ccff00]/5 cursor-pointer"
                           : "border-white/20 text-white hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5 cursor-pointer"
                         }`}
                       >
+                        {tieneDescuento && (
+                          <span className={`absolute -top-2 -right-2 flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-black text-[#ccff00]" : "bg-[#ccff00] text-black"}`}>
+                            <Tag className="h-2.5 w-2.5" />
+                            -{slot.porcentajeDescuento}%
+                          </span>
+                        )}
                         <p className={`font-mono-accent text-sm font-bold ${isSelected ? "text-black" : ""}`}>
                           {timeLabel(slot.horaInicio, horarios)}
                         </p>
-                        <p className={`text-xs mt-1 ${isSelected ? "text-black/70" : isDisabled ? "text-[#A1A1AA]" : "text-[#A1A1AA]"}`}>
-                          {isDisabled ? "No Disponible" : "Disponible"}
-                        </p>
+                        {tieneDescuento ? (
+                          <div className="mt-1">
+                            <p className={`text-xs line-through ${isSelected ? "text-black/50" : "text-[#A1A1AA]"}`}>
+                              ${cancha?.precio_hora?.toLocaleString()}
+                            </p>
+                            <p className={`text-xs font-bold ${isSelected ? "text-black" : "text-[#ccff00]"}`}>
+                              ${slot.precioConDescuento?.toLocaleString()}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className={`text-xs mt-1 ${isSelected ? "text-black/70" : "text-[#A1A1AA]"}`}>
+                            Disponible
+                          </p>
+                        )}
                       </button>
                     );
                   })}
@@ -209,7 +228,14 @@ export default function Booking() {
                         {format(date, "EEEE d 'de' MMMM", { locale: es })} | {timeLabel(selected.horaInicio, horarios)}
                       </p>
                     </div>
-                    <p className="font-mono-accent text-[#ccff00] font-bold text-lg sm:text-xl">${cancha.precio_hora?.toLocaleString()}</p>
+                    <div className="text-right">
+                      {selected?.tieneDescuento && (
+                        <p className="text-xs text-[#A1A1AA] line-through">${cancha.precio_hora?.toLocaleString()}</p>
+                      )}
+                      <p className="font-mono-accent text-[#ccff00] font-bold text-lg sm:text-xl">
+                        ${(selected?.tieneDescuento ? selected?.precioConDescuento : cancha.precio_hora)?.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                   {user && !user.celular ? (
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-sm p-3 sm:p-4" data-testid="missing-phone-warning">
@@ -368,15 +394,23 @@ export default function Booking() {
             </div>
             <div className="border-t border-white/10 pt-3 flex justify-between">
               <span className="text-[#A1A1AA]">Precio total</span>
-              <span className="text-white font-bold font-mono-accent">${cancha?.precio_hora?.toLocaleString()}</span>
+              <div className="text-right">
+                {selected?.tieneDescuento && (
+                  <p className="text-xs text-[#A1A1AA] line-through">${cancha?.precio_hora?.toLocaleString()}</p>
+                )}
+                <span className="text-white font-bold font-mono-accent">
+                  ${(selected?.tieneDescuento ? selected?.precioConDescuento : cancha?.precio_hora)?.toLocaleString()}
+                </span>
+                {selected?.tieneDescuento && (
+                  <span className="ml-2 text-xs bg-[#ccff00]/10 text-[#ccff00] border border-[#ccff00]/20 rounded-full px-2 py-0.5 font-bold">
+                    -{selected.porcentajeDescuento}%
+                  </span>
+                )}
+              </div>
             </div>
-            {/* <div className="flex justify-between">
-              <span className="text-[#A1A1AA]">Seña a pagar (MP)</span>
-              <span className="text-[#ccff00] font-bold font-mono-accent text-lg">${Math.round(cancha?.precio_hora * 0.5)?.toLocaleString()}</span>
-            </div> */}
             {(() => {
-              const precioHora = cancha?.precio_hora ?? 0; 
-              const base = precioHora / 2;
+              const precioTotal = selected?.tieneDescuento ? (selected?.precioConDescuento ?? 0) : (cancha?.precio_hora ?? 0);
+              const base = Math.round(precioTotal / 2 * 100) / 100;
               const total = Math.round(base / (1 - 0.053119) * 100) / 100;
               const recargo = Math.round((total - base) * 100) / 100;
               return (

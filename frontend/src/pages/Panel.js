@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Loader2, LayoutDashboard, Calendar, CalendarDays, MapPin, Users, MoreVertical, Plus, Pencil, Trash2, Power, CheckCircle2, DollarSign, TrendingUp, XCircle, CheckCheck, Settings, Search, Ban, Repeat, MessageCircle, Download, Upload, ChevronLeft, ChevronRight, ShieldCheck, AlertCircle } from "lucide-react";
+import { Loader2, LayoutDashboard, Calendar, CalendarDays, MapPin, Users, MoreVertical, Plus, Pencil, Trash2, Power, CheckCircle2, DollarSign, TrendingUp, XCircle, CheckCheck, Settings, Search, Ban, Repeat, MessageCircle, Download, Upload, ChevronLeft, ChevronRight, ShieldCheck, AlertCircle, Tag, Share2, ImageIcon } from "lucide-react";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, addDays, subDays } from "date-fns";
@@ -67,6 +67,16 @@ export default function Panel() {
                 <Ban className="mr-1.5 sm:mr-2 h-4 w-4" /> Bloqueos
               </TabsTrigger>
             )}
+            {canDo("puedeGestionarDescuentos") && (
+              <TabsTrigger value="descuentos" className="rounded-sm data-[state=active]:bg-[#ccff00] data-[state=active]:text-black text-[#A1A1AA] px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" data-testid="tab-descuentos">
+                <Tag className="mr-1.5 sm:mr-2 h-4 w-4" /> Descuentos
+              </TabsTrigger>
+            )}
+            {canDo("puedePublicarTurnos") && (
+              <TabsTrigger value="compartir" className="rounded-sm data-[state=active]:bg-[#ccff00] data-[state=active]:text-black text-[#A1A1AA] px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" data-testid="tab-compartir">
+                <Share2 className="mr-1.5 sm:mr-2 h-4 w-4" /> Compartir
+              </TabsTrigger>
+            )}
             {canDo("puedeVerFacturacion") && (
               <TabsTrigger value="facturacion" className="rounded-sm data-[state=active]:bg-[#ccff00] data-[state=active]:text-black text-[#A1A1AA] px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" data-testid="tab-facturacion">
                 <DollarSign className="mr-1.5 sm:mr-2 h-4 w-4" /> Facturacion
@@ -91,6 +101,8 @@ export default function Panel() {
           <TabsContent value="agenda"><AgendaTab canCrear={canDo("puedeCrearReservas")} canCambiarEstado={canDo("puedeCambiarEstado")} /></TabsContent>
           {canDo("puedeGestionarTurnosFijos") && <TabsContent value="turnos-fijos"><TurnosFijosTab /></TabsContent>}
           {canDo("puedeGestionarBloqueos") && <TabsContent value="bloqueos"><BloqueosTab /></TabsContent>}
+          {canDo("puedeGestionarDescuentos") && <TabsContent value="descuentos"><DescuentosTab /></TabsContent>}
+          {canDo("puedePublicarTurnos") && <TabsContent value="compartir"><CompartirTab /></TabsContent>}
           {canDo("puedeVerFacturacion") && <TabsContent value="facturacion"><FacturacionTab /></TabsContent>}
           {isAdmin && <TabsContent value="canchas"><CanchasTab /></TabsContent>}
           {isAdmin && <TabsContent value="usuarios"><UsuariosTab /></TabsContent>}
@@ -651,9 +663,11 @@ const PERMISOS_LABELS = [
   { key: "puedeVerReservas",        label: "Ver reservas",          desc: "Acceso al panel, reservas y agenda" },
   { key: "puedeCrearReservas",      label: "Crear reservas",        desc: "Crear reservas presenciales desde la agenda" },
   { key: "puedeCambiarEstado",      label: "Cambiar estado",        desc: "Confirmar, completar o cancelar reservas" },
-  { key: "puedeGestionarBloqueos",  label: "Gestionar bloqueos",    desc: "Crear y eliminar bloqueos de horarios" },
+  { key: "puedeGestionarBloqueos",   label: "Gestionar bloqueos",    desc: "Crear y eliminar bloqueos de horarios" },
   { key: "puedeGestionarTurnosFijos", label: "Gestionar turnos fijos", desc: "Crear y eliminar turnos fijos" },
-  { key: "puedeVerFacturacion",     label: "Ver facturación",       desc: "Ver estadísticas y reportes de facturación" },
+  { key: "puedeGestionarDescuentos", label: "Gestionar descuentos",  desc: "Crear y eliminar descuentos por horario" },
+  { key: "puedeVerFacturacion",      label: "Ver facturación",       desc: "Ver estadísticas y reportes de facturación" },
+  { key: "puedePublicarTurnos",      label: "Compartir turnos",      desc: "Generar imágenes de turnos para redes sociales" },
 ];
 
 function UsuariosTab() {
@@ -681,7 +695,9 @@ function UsuariosTab() {
       puedeCambiarEstado: u.puedeCambiarEstado,
       puedeGestionarBloqueos: u.puedeGestionarBloqueos,
       puedeGestionarTurnosFijos: u.puedeGestionarTurnosFijos,
+      puedeGestionarDescuentos: u.puedeGestionarDescuentos,
       puedeVerFacturacion: u.puedeVerFacturacion,
+      puedePublicarTurnos: u.puedePublicarTurnos,
     });
     setDialogPermisos(u);
   };
@@ -2248,6 +2264,515 @@ function ConfigTab() {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─── Canvas helper para imagen de redes ─── */
+async function dibujarCanvas(canchasInfo, slotsData, fecha) {
+  await document.fonts.ready;
+
+  // Medidas para historias de Instagram (9:16)
+  const W = 1080;
+  const H = 1920;
+  const PAD = 60;
+  const numCols = canchasInfo.length;
+  const maxSlots = Math.max(...canchasInfo.map(c => (slotsData[c.id] || []).length), 1);
+
+  // Zonas fijas del layout
+  const HEADER_H = 620;
+  const FOOTER_H = 240;
+  const COLS_H = H - HEADER_H - FOOTER_H; // 1060px para los turnos
+
+  // Altura por slot: se reparte el espacio disponible (con 110px para el título de columna)
+  const SLOT_H = Math.min(130, Math.max(72, Math.floor((COLS_H - 110) / maxSlots)));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // Imagen de fondo
+  try {
+    const bgImg = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.crossOrigin = "anonymous";
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = "/pelota.avif";
+    });
+    const scale = Math.max(W / bgImg.width, H / bgImg.height);
+    const bw = bgImg.width * scale;
+    const bh = bgImg.height * scale;
+    const bx = (W - bw) / 2;
+    const by = (H - bh) / 2;
+    ctx.drawImage(bgImg, bx, by, bw, bh);
+  } catch {
+    ctx.fillStyle = "#0a0a0a";
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Capa oscura semitransparente
+  ctx.fillStyle = "rgba(0, 0, 0, 0.80)";
+  ctx.fillRect(0, 0, W, H);
+
+  // Borde verde neón
+  const BP = 32;
+  ctx.strokeStyle = "#ccff00";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(BP, BP, W - BP * 2, H - BP * 2);
+
+  // ── HEADER ──
+  let yPos = 100;
+
+  // Logo
+  try {
+    const logoImg = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.crossOrigin = "anonymous";
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = "/icon-192.png";
+    });
+    const logoSize = 140;
+    ctx.drawImage(logoImg, (W - logoSize) / 2, yPos, logoSize, logoSize);
+    yPos += logoSize + 36;
+  } catch {
+    yPos += 36;
+  }
+
+  ctx.textAlign = "center";
+
+  // Nombre complejo
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 72px Arial";
+  ctx.fillText("COMPLEJO GNC", W / 2, yPos + 56);
+  yPos += 88;
+
+  // Subtítulo
+  ctx.fillStyle = "#ccff00";
+  ctx.font = "bold 54px Arial";
+  ctx.fillText("TURNOS DISPONIBLES", W / 2, yPos + 50);
+  yPos += 80;
+
+  // Fecha
+  const d = new Date(fecha + "T12:00:00");
+  const ds = d.toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "long" });
+  ctx.fillStyle = "#dddddd";
+  ctx.font = "42px Arial";
+  ctx.fillText(ds.charAt(0).toUpperCase() + ds.slice(1), W / 2, yPos + 38);
+
+  // Línea divisora header
+  ctx.strokeStyle = "#ccff00";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(PAD * 2, HEADER_H - 20);
+  ctx.lineTo(W - PAD * 2, HEADER_H - 20);
+  ctx.stroke();
+
+  // ── COLUMNAS DE TURNOS ──
+  const colW = (W - PAD * 2) / numCols;
+
+  canchasInfo.forEach((cancha, idx) => {
+    const cx = PAD + idx * colW + colW / 2;
+    const slots = slotsData[cancha.id] || [];
+
+    // Separador vertical entre columnas
+    if (idx > 0) {
+      ctx.strokeStyle = "#333333";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(PAD + idx * colW, HEADER_H + 10);
+      ctx.lineTo(PAD + idx * colW, HEADER_H + COLS_H - 10);
+      ctx.stroke();
+    }
+
+    // Nombre cancha
+    ctx.fillStyle = "#ccff00";
+    ctx.font = "bold 44px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(cancha.nombre, cx, HEADER_H + 68, colW - 20);
+
+    // Horarios
+    slots.forEach((time, ri) => {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${Math.min(68, SLOT_H - 20)}px 'Courier New', monospace`;
+      ctx.textAlign = "center";
+      ctx.fillText(time, cx, HEADER_H + 130 + ri * SLOT_H);
+    });
+
+    if (slots.length === 0) {
+      ctx.fillStyle = "#555555";
+      ctx.font = "34px Arial";
+      ctx.fillText("Sin disponibilidad", cx, HEADER_H + 130, colW - 20);
+    }
+  });
+
+  // ── FOOTER ──
+  const fy = HEADER_H + COLS_H + 22;
+  ctx.strokeStyle = "#333333";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD * 2, fy);
+  ctx.lineTo(W - PAD * 2, fy);
+  ctx.stroke();
+
+  ctx.fillStyle = "#888888";
+  ctx.font = "34px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Reservá en línea:", W / 2, fy + 72);
+
+  ctx.fillStyle = "#ccff00";
+  ctx.font = "bold 40px Arial";
+  ctx.fillText(window.location.hostname, W / 2, fy + 130);
+
+  return canvas.toDataURL("image/png");
+}
+
+/* ─── Compartir Tab ─── */
+function CompartirTab() {
+  const [canchas, setCanchas] = useState([]);
+  const [seleccion, setSeleccion] = useState([]);
+  const [fecha, setFecha] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    api.get("/canchas").then(r => setCanchas(r.data)).catch(() => {});
+  }, []);
+
+  const toggleCancha = (id) => {
+    setSeleccion(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setPreview(null);
+  };
+
+  const handleGenerar = async () => {
+    if (!fecha || seleccion.length === 0) {
+      toast.error("Seleccioná una fecha y al menos una cancha"); return;
+    }
+    setGenerating(true);
+    try {
+      const slotsData = {};
+      for (const id of seleccion) {
+        const r = await api.get(`/reservas/disponibilidad/${id}?fecha=${fecha}`);
+        slotsData[id] = r.data.horarios.filter(s => s.disponible).map(s => s.horaInicio.slice(0, 5));
+      }
+      const canchasInfo = canchas.filter(c => seleccion.includes(c.id));
+      const dataUrl = await dibujarCanvas(canchasInfo, slotsData, fecha);
+      setPreview(dataUrl);
+    } catch {
+      toast.error("Error al generar la imagen");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleDescargar = () => {
+    const link = document.createElement("a");
+    link.download = `turnos-gnc-${fecha}.png`;
+    link.href = preview;
+    link.click();
+  };
+
+  const handleCompartir = async () => {
+    if (!preview) return;
+    try {
+      const res = await fetch(preview);
+      const blob = await res.blob();
+      const file = new File([blob], `turnos-gnc-${fecha}.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Turnos disponibles - GNC" });
+      } else {
+        // Fallback en desktop: descargar
+        handleDescargar();
+        toast.info("Tu navegador no soporta compartir directo. Se descargó la imagen.");
+      }
+    } catch (err) {
+      if (err?.name !== "AbortError") toast.error("Error al compartir");
+    }
+  };
+
+  return (
+    <div className="space-y-6" data-testid="compartir-tab">
+      <div>
+        <h2 className="text-xl font-bold text-white">Generar imagen para redes</h2>
+        <p className="text-sm text-[#A1A1AA] mt-1">Creá una imagen con los turnos disponibles para compartir en Instagram o WhatsApp</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Config */}
+        <div className="space-y-4">
+          <div className="bg-[#161618] border border-white/10 rounded-sm p-4 space-y-3">
+            <h3 className="text-white font-semibold text-sm">Fecha</h3>
+            <Input
+              type="date"
+              value={fecha}
+              onChange={e => { setFecha(e.target.value); setPreview(null); }}
+              min={new Date().toISOString().split("T")[0]}
+              className="bg-[#09090b] border-white/10 text-white rounded-sm"
+            />
+          </div>
+
+          <div className="bg-[#161618] border border-white/10 rounded-sm p-4 space-y-3">
+            <h3 className="text-white font-semibold text-sm">Canchas a incluir</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {canchas.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => toggleCancha(c.id)}
+                  className={`rounded-sm border px-3 py-2.5 text-sm font-medium transition-all text-left ${
+                    seleccion.includes(c.id)
+                      ? "bg-[#ccff00]/10 border-[#ccff00] text-[#ccff00]"
+                      : "border-white/10 text-[#A1A1AA] hover:border-white/30 hover:text-white"
+                  }`}
+                >
+                  {c.nombre}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Button
+            onClick={handleGenerar}
+            disabled={generating || !fecha || seleccion.length === 0}
+            className="w-full bg-[#ccff00] text-black font-bold hover:bg-[#b3e600] rounded-sm h-11"
+            data-testid="generar-imagen-btn"
+          >
+            {generating
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generando...</>
+              : <><ImageIcon className="h-4 w-4 mr-2" />Generar imagen</>
+            }
+          </Button>
+        </div>
+
+        {/* Preview */}
+        <div className="bg-[#161618] border border-white/10 rounded-sm p-4 flex flex-col items-center justify-center min-h-64">
+          {preview ? (
+            <div className="w-full space-y-4">
+              {/* Contenedor con proporción 9:16 para historias de Instagram */}
+              <div className="relative w-full" style={{ aspectRatio: "9 / 16" }}>
+                <img src={preview} alt="Preview turnos" className="absolute inset-0 w-full h-full object-contain rounded-sm border border-white/10" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={handleDescargar}
+                  variant="outline"
+                  className="w-full border-white/20 text-white hover:bg-white/5 rounded-sm"
+                  data-testid="descargar-imagen-btn"
+                >
+                  <Download className="h-4 w-4 mr-2" /> Descargar
+                </Button>
+                <Button
+                  onClick={handleCompartir}
+                  className="w-full bg-[#ccff00] text-black font-bold hover:bg-[#b3e600] rounded-sm"
+                  data-testid="compartir-imagen-btn"
+                >
+                  <Share2 className="h-4 w-4 mr-2" /> Compartir
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-[#A1A1AA] py-8">
+              <Share2 className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium text-white/50">Vista previa</p>
+              <p className="text-xs mt-1">Seleccioná fecha y canchas para generar</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Descuentos Tab ─── */
+function DescuentosTab() {
+  const [descuentos, setDescuentos] = useState([]);
+  const [canchas, setCanchas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showDialog, setShowDialog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ canchaId: "", fecha: "", horaInicio: "", porcentaje: "" });
+
+  const fetchDescuentos = () => {
+    api.get("/descuentos").then(r => { setDescuentos(r.data); setLoading(false); }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDescuentos();
+    api.get("/canchas").then(r => setCanchas(r.data)).catch(() => {});
+  }, []);
+
+  const handleGuardar = async () => {
+    if (!form.canchaId || !form.fecha || !form.horaInicio || !form.porcentaje) {
+      toast.error("Completá todos los campos"); return;
+    }
+    const pct = Number(form.porcentaje);
+    if (pct < 1 || pct > 100) { toast.error("El porcentaje debe estar entre 1 y 100"); return; }
+    setSaving(true);
+    try {
+      await api.post("/descuentos", {
+        canchaId: Number(form.canchaId),
+        fecha: form.fecha,
+        horaInicio: form.horaInicio + ":00",
+        porcentaje: pct,
+      });
+      toast.success("Descuento guardado");
+      setShowDialog(false);
+      setForm({ canchaId: "", fecha: "", horaInicio: "", porcentaje: "" });
+      fetchDescuentos();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error al guardar descuento");
+    } finally { setSaving(false); }
+  };
+
+  const handleEliminar = async (id) => {
+    try {
+      await api.delete(`/descuentos/${id}`);
+      toast.success("Descuento eliminado");
+      fetchDescuentos();
+    } catch { toast.error("Error al eliminar"); }
+  };
+
+  // Generar slots de hora (00:00 a 23:00)
+  const horaSlots = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0") + ":00");
+
+  return (
+    <div className="space-y-6" data-testid="descuentos-tab">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-white">Descuentos por horario</h2>
+          <p className="text-sm text-[#A1A1AA] mt-1">Aplicá descuentos a horarios específicos de cada cancha</p>
+        </div>
+        <Button
+          onClick={() => setShowDialog(true)}
+          className="bg-[#ccff00] text-black font-bold hover:bg-[#b3e600] rounded-sm"
+          data-testid="nuevo-descuento-btn"
+        >
+          <Plus className="h-4 w-4 mr-2" /> Nuevo descuento
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#ccff00]" /></div>
+      ) : descuentos.length === 0 ? (
+        <div className="bg-[#161618] border border-white/10 rounded-sm p-12 text-center text-[#A1A1AA]">
+          <Tag className="h-10 w-10 mx-auto mb-3 opacity-30" />
+          <p className="font-semibold text-white mb-1">Sin descuentos</p>
+          <p className="text-sm">Todavía no hay descuentos configurados</p>
+        </div>
+      ) : (
+        <div className="bg-[#161618] border border-white/10 rounded-sm overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="text-[#A1A1AA]">Cancha</TableHead>
+                <TableHead className="text-[#A1A1AA]">Fecha</TableHead>
+                <TableHead className="text-[#A1A1AA]">Horario</TableHead>
+                <TableHead className="text-[#A1A1AA]">Descuento</TableHead>
+                <TableHead className="text-[#A1A1AA] text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {descuentos.map(d => (
+                <TableRow key={d.id} className="border-white/10 hover:bg-white/5">
+                  <TableCell className="text-white font-medium">{d.cancha?.nombre ?? `Cancha ${d.cancha?.id}`}</TableCell>
+                  <TableCell className="text-[#A1A1AA]">{d.fecha}</TableCell>
+                  <TableCell className="text-[#A1A1AA] font-mono-accent">{d.horaInicio?.slice(0, 5)}</TableCell>
+                  <TableCell>
+                    <Badge className="bg-[#ccff00]/10 text-[#ccff00] border-[#ccff00]/20 font-bold">
+                      -{d.porcentaje}%
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEliminar(d.id)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      data-testid={`eliminar-descuento-${d.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Dialog nuevo descuento */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="bg-[#161618] border border-white/10 text-white rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white">Nuevo descuento</DialogTitle>
+            <DialogDescription className="text-[#A1A1AA]">
+              Configurá un descuento para un horario específico de una cancha
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-[#A1A1AA]">Cancha</Label>
+              <Select value={form.canchaId} onValueChange={v => setForm(f => ({ ...f, canchaId: v }))}>
+                <SelectTrigger className="bg-[#09090b] border-white/10 text-white rounded-sm">
+                  <SelectValue placeholder="Seleccioná una cancha" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#161618] border-white/10 text-white">
+                  {canchas.map(c => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[#A1A1AA]">Fecha</Label>
+              <Input
+                type="date"
+                value={form.fecha}
+                onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+                min={new Date().toISOString().split("T")[0]}
+                className="bg-[#09090b] border-white/10 text-white rounded-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[#A1A1AA]">Horario de inicio</Label>
+              <Select value={form.horaInicio} onValueChange={v => setForm(f => ({ ...f, horaInicio: v }))}>
+                <SelectTrigger className="bg-[#09090b] border-white/10 text-white rounded-sm">
+                  <SelectValue placeholder="Seleccioná una hora" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#161618] border-white/10 text-white max-h-48 overflow-y-auto">
+                  {horaSlots.map(h => (
+                    <SelectItem key={h} value={h}>{h}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[#A1A1AA]">Porcentaje de descuento</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={form.porcentaje}
+                  onChange={e => setForm(f => ({ ...f, porcentaje: e.target.value }))}
+                  placeholder="Ej: 20"
+                  className="bg-[#09090b] border-white/10 text-white rounded-sm pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A1A1AA] text-sm">%</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDialog(false)} className="border-white/10 text-white rounded-sm hover:bg-white/5">
+              Cancelar
+            </Button>
+            <Button onClick={handleGuardar} disabled={saving} className="bg-[#ccff00] text-black font-bold hover:bg-[#b3e600] rounded-sm">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar descuento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -48,7 +48,7 @@ public class TokenCleanupScheduler {
     }
 
     // Se ejecuta todos los días a las 04:00
-    @Scheduled(cron = "0 0 4 * * *")
+    @Scheduled(cron = "0 0 2 * * *")
     @Transactional
     public void eliminarReservasAntiguas() {
         LocalDate fechaLimite = LocalDate.now().minusMonths(1);
