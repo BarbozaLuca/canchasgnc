@@ -2417,14 +2417,10 @@ async function dibujarCanvas(canchasInfo, slotsData, fecha) {
   ctx.lineTo(W - PAD * 2, fy);
   ctx.stroke();
 
-  ctx.fillStyle = "#888888";
-  ctx.font = "34px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("Reservá en línea:", W / 2, fy + 72);
-
   ctx.fillStyle = "#ccff00";
-  ctx.font = "bold 40px Arial";
-  ctx.fillText(window.location.hostname, W / 2, fy + 130);
+  ctx.font = "bold 42px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Reservá desde nuestra app · canchasgnc.com.ar", W / 2, fy + 100);
 
   return canvas.toDataURL("image/png");
 }
